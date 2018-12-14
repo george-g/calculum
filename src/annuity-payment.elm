@@ -103,10 +103,8 @@ viewValidation model =
 
           duration =
             Maybe.withDefault 0 durationMaybe
-          
-          x = ( 1 + monthInterest ) ^ duration
 
-          k = ( monthInterest * x ) / (x - 1)
+          k = monthInterest / ( 1 - ( 1 + monthInterest)^( -1 * duration ) )
 
           anuitent = k * amount
       in
