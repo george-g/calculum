@@ -4,7 +4,8 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (onInput)
 import Maybe.Extra exposing (isNothing)
 import Round exposing (..)
-
+import Time exposing (..)
+import Time.Extra as Time
 
 -- TYPES
 
@@ -110,16 +111,22 @@ viewValidation model =
 
           anuitent = k * amount
 
-          anuitentInt = Debug.log "anuintenInt" <| Basics.round <| anuitent * minorUnitsFactor
+          anuitentInt = {-- Debug.log "anuintenInt" <| --}
+            Basics.round <| anuitent * minorUnitsFactor
 
-          amountInt = Debug.log "amountInt" <| Basics.round <| amount * minorUnitsFactor
+          amountInt = {-- Debug.log "amountInt" <| --}
+            Basics.round <| amount * minorUnitsFactor
 
-          lst = calcPayments (Payment anuitentInt 0 0 interest amountInt)
+          lst = calcPayments (Payment anuitentInt 0 0 interest amountInt 
+                {-- ( Time.partsToPosix utc (Time.Parts 2017 Dec 13 0 0 0 0) ) --}
+                {--} ( millisToPosix 0 ) --}
+                0)
       in
         div [] 
         [ div [ style "color" "green" ] [ text ( "Вот вам результат: " ++ Round.round 2 anuitent ) ]
         , table [] (List.map (\l -> tr [] 
-                    [ td [] [ text <| ( toString l.payment ) ]
+                    [ td [] [ text <| ( String.fromInt l.periodNum ) ]
+                    , td [] [ text <| ( toString l.payment ) ]
                     , td [] [ text <| ( toString l.debtPayment ) ]
                     , td [] [ text <| ( toString l.interestPayment ) ]
                     , td [] [ text <| ( Round.round minorUnits l.interest ) ]
@@ -145,6 +152,8 @@ type alias Payment =
   , interestPayment : Int
   , interest : Float
   , debt : Int
+  , date : Posix
+  , periodNum : Int
   }
 
 calcPayments : Payment -> List Payment
@@ -155,15 +164,22 @@ calcPayments payment =
     payment :: calcPayments (calcNexPayment payment)
 
 calcNexPayment : Payment -> Payment
-calcNexPayment {payment, interest, debt} =
-  let 
-    interestPayment = Debug.log "interestPayment" <| Basics.round ( ( toFloat debt ) * interest * 31 / ( 365 * interestFactor ) )
+calcNexPayment {payment, interest, debt, date, periodNum} =
+  let
+    newDate = calcDate date
 
-    debtPayment = Debug.log "debtPayment" <| Basics.min (payment - interestPayment) debt
+    days = calcDiff date newDate
 
-    newDebt = Debug.log "newDebt" <| debt - debtPayment 
+    interestPayment = {-- Debug.log "interestPayment" <| --}
+      Basics.min payment <| Basics.round ( ( toFloat debt ) * days * interest / ( 365 * interestFactor ) ) 
+
+    debtPayment = {-- Debug.log "debtPayment" <| --}
+      Basics.min (payment - interestPayment) debt
+
+    newDebt = {-- Debug.log "newDebt" <| --}
+      debt - debtPayment 
   in
-    Payment payment debtPayment interestPayment interest newDebt
+    Payment payment debtPayment interestPayment interest newDebt newDate (periodNum + 1)
 
 toString : Int -> String
 toString value =
@@ -181,3 +197,17 @@ toString value =
         minorUnitsString = String.right minorUnits str
       in
         String.dropRight minorUnits str ++ "." ++ minorUnitsString
+
+calcDate : Posix -> Posix
+calcDate date =
+  if posixToMillis date == 0 then
+    date
+  else
+    Time.add Time.Month 1 utc date
+
+calcDiff : Posix -> Posix -> Float
+calcDiff dateAfter dateBefore =
+  if posixToMillis dateBefore == 0 then
+    365 / 12
+  else
+    Time.diff Time.Day utc dateAfter dateBefore |> toFloat
