@@ -98,8 +98,10 @@ viewValidation model =
           amount =
             Maybe.withDefault 0 amountMaybe
 
+          interest = Maybe.withDefault 0 interestMaybe
+
           monthInterest =
-            (Maybe.withDefault 0 interestMaybe) / (12 * 100)
+            interest / (12 * 100)
 
           duration =
             Maybe.withDefault 0 durationMaybe
@@ -107,5 +109,52 @@ viewValidation model =
           k = monthInterest / ( 1 - ( 1 + monthInterest)^( -1 * duration ) )
 
           anuitent = k * amount
+
+          lst = calcPayments (Payment anuitent 0 0 interest amount)
       in
-        div [ style "color" "green" ] [ text ( "Вот вам результат: " ++ round 2 anuitent ) ]
+        div [] 
+        [ div [ style "color" "green" ] [ text ( "Вот вам результат: " ++ round 2 anuitent ) ]
+        , table [] (List.map (\l -> tr [] 
+                    [ td [] [ text <| String.fromFloat(l.payment) ]
+                    , td [] [ text <| String.fromFloat(l.debtPayment) ]
+                    , td [] [ text <| String.fromFloat(l.interestPayment) ]
+                    , td [] [ text <| String.fromFloat(l.interest) ]
+                    , td [] [ text <| String.fromFloat(l.debt) ] 
+                    ] ) lst)
+        , ul [] (List.map (\l -> li [] 
+                    [ text <| String.fromFloat(l.payment)
+                    , text <| String.fromFloat(l.debtPayment) 
+                    , text <| String.fromFloat(l.interestPayment) 
+                    , text <| String.fromFloat(l.interest) 
+                    , text <| String.fromFloat(l.debt) ]) lst)
+        ]
+
+minorUnit : Int
+minorUnit = 100
+
+type alias Payment =
+  { payment : Float
+  , debtPayment : Float
+  , interestPayment : Float
+  , interest : Float
+  , debt : Float
+  }
+
+calcPayments : Payment -> List Payment
+calcPayments payment =
+  if payment.debt <= 0 then
+    []
+  else
+    payment :: calcPayments (calcNexPayment payment)
+
+calcNexPayment : Payment -> Payment
+calcNexPayment {payment, interest, debt} =
+  let 
+    interestPayment = debt * interest * 31 / 365
+
+    debtPayment = payment - interestPayment
+
+    newDebt = debt - debtPayment  
+  in
+    Payment payment debtPayment interestPayment interest newDebt
+
