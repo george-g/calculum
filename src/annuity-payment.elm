@@ -3,7 +3,7 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onInput)
 import Maybe.Extra exposing (isNothing)
-import Round exposing (round)
+import Round exposing (..)
 
 
 -- TYPES
@@ -101,7 +101,7 @@ viewValidation model =
           interest = Maybe.withDefault 0 interestMaybe
 
           monthInterest =
-            interest / (12 * 100)
+            interest / ( 12 * interestFactor )
 
           duration =
             Maybe.withDefault 0 durationMaybe
@@ -110,51 +110,74 @@ viewValidation model =
 
           anuitent = k * amount
 
-          lst = calcPayments (Payment anuitent 0 0 interest amount)
+          anuitentInt = Debug.log "anuintenInt" <| Basics.round <| anuitent * minorUnitsFactor
+
+          amountInt = Debug.log "amountInt" <| Basics.round <| amount * minorUnitsFactor
+
+          lst = calcPayments (Payment anuitentInt 0 0 interest amountInt)
       in
         div [] 
-        [ div [ style "color" "green" ] [ text ( "Вот вам результат: " ++ round 2 anuitent ) ]
+        [ div [ style "color" "green" ] [ text ( "Вот вам результат: " ++ Round.round 2 anuitent ) ]
         , table [] (List.map (\l -> tr [] 
-                    [ td [] [ text <| String.fromFloat(l.payment) ]
-                    , td [] [ text <| String.fromFloat(l.debtPayment) ]
-                    , td [] [ text <| String.fromFloat(l.interestPayment) ]
-                    , td [] [ text <| String.fromFloat(l.interest) ]
-                    , td [] [ text <| String.fromFloat(l.debt) ] 
+                    [ td [] [ text <| ( toString l.payment ) ]
+                    , td [] [ text <| ( toString l.debtPayment ) ]
+                    , td [] [ text <| ( toString l.interestPayment ) ]
+                    , td [] [ text <| ( Round.round minorUnits l.interest ) ]
+                    , td [] [ text <| ( toString l.debt ) ] 
                     ] ) lst)
-        , ul [] (List.map (\l -> li [] 
-                    [ text <| String.fromFloat(l.payment)
-                    , text <| String.fromFloat(l.debtPayment) 
-                    , text <| String.fromFloat(l.interestPayment) 
-                    , text <| String.fromFloat(l.interest) 
-                    , text <| String.fromFloat(l.debt) ]) lst)
         ]
 
-minorUnit : Int
-minorUnit = 100
+minorUnits : Int
+minorUnits = 2
+
+minorUnitsFactorInt : Int
+minorUnitsFactorInt = 10 ^ minorUnits
+
+minorUnitsFactor : Float
+minorUnitsFactor = toFloat minorUnitsFactorInt
+
+interestFactor : Float
+interestFactor = 100
 
 type alias Payment =
-  { payment : Float
-  , debtPayment : Float
-  , interestPayment : Float
+  { payment : Int
+  , debtPayment : Int
+  , interestPayment : Int
   , interest : Float
-  , debt : Float
+  , debt : Int
   }
 
 calcPayments : Payment -> List Payment
 calcPayments payment =
-  if payment.debt <= 0 then
-    []
+  if payment.debt <= 0 || payment.debtPayment < 0 then
+    [payment]
   else
     payment :: calcPayments (calcNexPayment payment)
 
 calcNexPayment : Payment -> Payment
 calcNexPayment {payment, interest, debt} =
   let 
-    interestPayment = debt * interest * 31 / 365
+    interestPayment = Debug.log "interestPayment" <| Basics.round ( ( toFloat debt ) * interest * 31 / ( 365 * interestFactor ) )
 
-    debtPayment = payment - interestPayment
+    debtPayment = Debug.log "debtPayment" <| Basics.min (payment - interestPayment) debt
 
-    newDebt = debt - debtPayment  
+    newDebt = Debug.log "newDebt" <| debt - debtPayment 
   in
     Payment payment debtPayment interestPayment interest newDebt
 
+toString : Int -> String
+toString value =
+  let
+    str = String.fromInt value
+  in
+    if value == 0 then
+      "0." ++ String.repeat minorUnits "0"
+    else if value < minorUnitsFactorInt && value > 0 then
+      "0." ++ (String.repeat (minorUnits - String.length str) "0" ) ++ str
+    else if value > minorUnitsFactorInt  && value < 0 then
+      "-0." ++ (String.repeat (minorUnits - 1 - String.length str) "0" ) ++ (String.dropLeft 1 str)
+    else
+      let
+        minorUnitsString = String.right minorUnits str
+      in
+        String.dropRight minorUnits str ++ "." ++ minorUnitsString
