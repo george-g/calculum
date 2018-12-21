@@ -6,6 +6,8 @@ import Maybe.Extra exposing (isNothing)
 import Round exposing (..)
 import Time exposing (..)
 import Time.Extra as Time
+import Json.Decode as Decode exposing (Decoder, Value)
+import Json.Decode.Extra as Decode  --"elm-community/json-extra"
 
 -- TYPES
 
@@ -19,7 +21,12 @@ type alias Duration = String
 
 
 main =
-  Browser.sandbox { init = init, update = update, view = view }
+  Browser.element 
+    { init = init
+    , update = update
+    , subscriptions = \s -> Sub.none
+    , view = view 
+    }
 
 
 
@@ -32,10 +39,26 @@ type alias Model =
   , duration : Duration
   }
 
+type alias Flags = Decode.Value
 
-init : Model
-init =
-  Model "" "" ""
+
+
+flagsDecoder : Decoder Model
+flagsDecoder =
+    Decode.map3 Model
+        (Decode.field "amount" Decode.string |> Decode.withDefault "")
+        (Decode.field "interest" Decode.string |> Decode.withDefault "")
+        (Decode.field "duration" Decode.string |> Decode.withDefault "")
+
+
+init : Flags -> ( Model, Cmd msg )
+init flags =
+    case Decode.decodeValue flagsDecoder flags of
+        Err _ ->
+            ( Model "" "" "", Cmd.none )
+
+        Ok model ->
+            ( model, Cmd.none )
 
 
 
@@ -48,17 +71,17 @@ type Msg
   | ChangeDuration Duration
 
 
-update : Msg -> Model -> Model
+update : Msg -> Model -> ( Model, Cmd msg )
 update msg model =
   case msg of
     ChangeAmount amount ->
-      { model | amount = amount }
+      ( { model | amount = amount }, Cmd.none )
 
     ChangeInterest interest ->
-      { model | interest = interest }
+      ( { model | interest = interest }, Cmd.none )
 
     ChangeDuration duration ->
-      { model | duration = duration }
+      ( { model | duration = duration }, Cmd.none )
 
 
 
